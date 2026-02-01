@@ -85,29 +85,27 @@
     <button id="no" type="button" aria-label="No, I will not be your valentine">No 😜</button>
   </div>
 
-  <!-- Sticker image: upload your image (e.g. myphoto.jpg) to the repo root and set stickerSrc accordingly -->
-  <img id="sticker" src="myphoto.jpg" alt="Sticker">
+  <!-- Change the filename below to the one you uploaded (newpic.jpg is used as example) -->
+  <img id="sticker" src="newpic.jpg" alt="Sticker">
 
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
   <script>
     // ===== config =====
-    // The URL to open in a new tab on Yes:
     const targetUrl = "https://sayonmallick.github.io/mithi-valentine/";
 
-    // Sticker filename in the repo root (change to your uploaded image filename if needed)
-    const stickerSrc = "myphoto.jpg";
+    // Set your new sticker filename here (must be uploaded to repo root)
+    const stickerSrc = "newpic.jpg";
 
     // ===== elements =====
     const noBtn = document.getElementById("no");
     const yesBtn = document.getElementById("yes");
     const sticker = document.getElementById("sticker");
 
-    // set sticker src and preload it so it appears instantly
+    // use the new sticker, preload it for instant show, and mark decorative for accessibility
     sticker.src = stickerSrc;
     const _preloadSticker = new Image();
     _preloadSticker.src = stickerSrc;
-    // decorative overlay — don't announce to screen readers
     sticker.setAttribute('aria-hidden', 'true');
 
     // ===== "No" button: move anywhere on viewport, but clicks do nothing =====
@@ -255,7 +253,7 @@
     }
 
     // ===== show sticker overlay =====
-    function showSticker(duration = 3500) {
+    function showSticker(duration = 5000) { // longer duration: 5000ms (5s)
       if (!sticker) return;
       sticker.classList.add('show');
       setTimeout(() => {
@@ -266,7 +264,7 @@
     // ===== Yes click: show sticker + confetti + sound, then open tab =====
     yesBtn.addEventListener("click", () => {
       // show visuals and play sound immediately
-      showSticker(3000);
+      showSticker(5000); // show sticker for 5 seconds
       firecrackerBurst();
       playFirecrackerSound();
 
