@@ -18,7 +18,7 @@
     }
     h1 { color: #d1004f; margin-bottom: 40px; text-align: center; }
 
-    .buttons { display: flex; align-items: center; gap: 20px; }
+    .buttons { display: flex; align-items: center; gap: 20px; z-index: 2; }
 
     button {
       padding: 15px 30px;
@@ -50,6 +50,45 @@
       display: block;
     }
     #sticker.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+    /* hearts layer (floating love signs) */
+    .hearts-layer {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none; /* non-interactive */
+      overflow: hidden;
+      z-index: 1; /* behind UI but above background */
+    }
+    .heart {
+      position: absolute;
+      bottom: -40px;
+      font-size: 18px;
+      will-change: transform, opacity;
+      opacity: 0.95;
+      transform: translateY(0) rotate(0deg) scale(1);
+      animation-name: floatUp, sway;
+      animation-timing-function: linear, ease-in-out;
+      animation-iteration-count: 1, infinite;
+      user-select: none;
+    }
+    /* float up and fade out */
+    @keyframes floatUp {
+      0% { transform: translateY(0) scale(0.8); opacity: 1; }
+      70% { opacity: 1; }
+      100% { transform: translateY(-120vh) scale(1.05); opacity: 0; }
+    }
+    /* gentle horizontal sway */
+    @keyframes sway {
+      0% { transform: translateX(0) rotate(-10deg); }
+      50% { transform: translateX(12px) rotate(10deg); }
+      100% { transform: translateX(0) rotate(-10deg); }
+    }
+
+    /* ensure UI elements sit above hearts and sticker above everything */
+    .buttons { position: relative; z-index: 3; }
   </style>
 </head>
 <body>
@@ -61,21 +100,31 @@
     <button id="no"  type="button" aria-label="No">No 😜</button>
   </div>
 
-  <!-- Use the raw.githubusercontent URL to ensure the image loads from this repo -->
+  <!-- Sticker image (from your Guest repo) -->
   <img id="sticker" src="https://raw.githubusercontent.com/sayonmallick/Guest/main/myphoto.jpg" alt="Sticker">
+
+  <!-- Hearts layer -->
+  <div class="hearts-layer" aria-hidden="true"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <script>
     // ---------- CONFIG ----------
-    // The page we want to open (Guest Pages). This is the only URL used.
-    const targetUrl = "https://deb.github.io/valentine/";
+    const targetUrl = "https://sayonmallick.github.io/Guest/";
+    // Hearts config: spawn every X ms, up to max simultaneous hearts
+    const HEART_SPAWN_INTERVAL = 600; // ms between spawns
+    const MAX_HEARTS = 18;
+
+    // heart glyphs/colors you can customize
+    const HEART_CHARS = ['❤','💖','💘','❣️','💕'];
+    const HEART_COLORS = ['#ff2f6d', '#ff7f50', '#ffb3c6', '#ffd700', '#ff66b2'];
 
     // ---------- ELEMENTS ----------
     const noBtn = document.getElementById('no');
     const yesBtn = document.getElementById('yes');
     const sticker = document.getElementById('sticker');
+    const heartsLayer = document.querySelector('.hearts-layer');
 
-    // Preload the sticker to avoid delay when showing
+    // preload sticker
     const _pre = new Image();
     _pre.src = sticker.src;
     sticker.setAttribute('aria-hidden', 'true');
@@ -98,7 +147,7 @@
     noBtn.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); moveNo(); }});
     window.addEventListener('load', () => { moveNo(); });
 
-    // ---------- confetti & sound ----------
+    // ---------- confetti & sound (unchanged) ----------
     function firecrackerBurst() {
       if (typeof confetti !== 'function') return;
       const colors = [['#ff2f6d','#ffd700','#ff7f50'], ['#ffb3c6','#ffffff','#ffd700'], ['#00aaff','#a0e9ff','#ffffff']];
@@ -155,18 +204,53 @@
       }
     }
 
+    // ---------- hearts animation ----------
+    let currentHearts = 0;
+    function spawnHeart() {
+      if (!heartsLayer) return;
+      if (currentHearts >= MAX_HEARTS) return;
+
+      const heart = document.createElement('div');
+      heart.className = 'heart';
+      const glyph = HEART_CHARS[Math.floor(Math.random() * HEART_CHARS.length)];
+      heart.textContent = glyph;
+      const color = HEART_COLORS[Math.floor(Math.random() * HEART_COLORS.length)];
+      const size = 14 + Math.random() * 34; // px
+      const left = Math.random() * 100; // percent
+      const duration = 3500 + Math.random() * 3000; // ms
+
+      // position & style
+      heart.style.left = left + 'vw';
+      heart.style.fontSize = size + 'px';
+      heart.style.color = color;
+      // set animation durations (floatUp and sway)
+      heart.style.animationDuration = (duration / 1000) + 's, ' + (2 + Math.random()*3) + 's';
+
+      heartsLayer.appendChild(heart);
+      currentHearts++;
+
+      // clean up after animation finishes
+      setTimeout(() => {
+        heart.remove();
+        currentHearts = Math.max(0, currentHearts - 1);
+      }, duration + 200);
+    }
+
+    // spawn hearts periodically
+    const heartInterval = setInterval(spawnHeart, HEART_SPAWN_INTERVAL);
+    // spawn a few initially for instant effect
+    for (let i = 0; i < 6; i++) setTimeout(spawnHeart, i * 150);
+
     // ---------- sticker show ----------
     function showSticker(duration = 5000) {
       if (!sticker) return;
-      console.log('Showing sticker for', duration, 'ms');
       sticker.classList.add('show');
       setTimeout(() => sticker.classList.remove('show'), duration);
     }
 
     // ---------- Yes button: show sticker then open Guest page ----------
     yesBtn.addEventListener('click', () => {
-      console.log('Yes clicked — show sticker, confetti, sound, then open Guest page');
-      showSticker(5000);           // longer view time
+      showSticker(5000);
       firecrackerBurst();
       playFirecrackerSound();
 
@@ -182,13 +266,9 @@
       }, delayMs);
     });
 
-    // ---------- debug helper: log image load errors ----------
-    sticker.addEventListener('error', () => {
-      console.error('Sticker image failed to load:', sticker.src);
-    });
-    sticker.addEventListener('load', () => {
-      console.log('Sticker image loaded:', sticker.src);
-    });
+    // debug helpers
+    sticker.addEventListener('error', () => console.error('Sticker image failed to load:', sticker.src));
+    sticker.addEventListener('load', () => console.log('Sticker image loaded:', sticker.src));
   </script>
 </body>
 </html>
