@@ -85,24 +85,25 @@
     <button id="no" type="button" aria-label="No, I will not be your valentine">No 😜</button>
   </div>
 
-  <!-- Change the filename below to the one you uploaded (newpic.jpg is used as example) -->
-  <img id="sticker" src="newpic.jpg" alt="Sticker">
+  <!-- Sticker image (must exist in repo root with this exact filename) -->
+  <img id="sticker" src="myphoto.jpg" alt="Sticker">
 
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
   <script>
     // ===== config =====
-    const targetUrl = "https://sayonmallick.github.io/mithi-valentine/";
+    // NOTE: changed to Guest Pages URL so it won't redirect to the mithi site
+    const targetUrl = "https://sayonmallick.github.io/Guest/";
 
-    // Set your new sticker filename here (must be uploaded to repo root)
-    const stickerSrc = "newpic.jpg";
+    // Sticker filename in repo root (must match the file you uploaded)
+    const stickerSrc = "myphoto.jpg";
 
     // ===== elements =====
     const noBtn = document.getElementById("no");
     const yesBtn = document.getElementById("yes");
     const sticker = document.getElementById("sticker");
 
-    // use the new sticker, preload it for instant show, and mark decorative for accessibility
+    // ensure sticker uses the file you uploaded, preload for instant display, mark decorative for SR
     sticker.src = stickerSrc;
     const _preloadSticker = new Image();
     _preloadSticker.src = stickerSrc;
@@ -124,21 +125,18 @@
       noBtn.style.top = y + "px";
     }
 
-    // Move on mouse hover and touch (mobile)
     noBtn.addEventListener("pointerenter", moveNo);
     noBtn.addEventListener("touchstart", (e) => {
       e.preventDefault();
       moveNo();
     }, {passive: false});
 
-    // Make clicks on "No" do nothing (so it's effectively not clickable)
     noBtn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
       moveNo();
     });
 
-    // Keyboard behaviour: move on Enter/Space but don't navigate away
     noBtn.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
@@ -146,7 +144,6 @@
       }
     });
 
-    // Initial placement (center-right-ish)
     window.addEventListener('load', () => {
       const left = Math.min(window.innerWidth - noBtn.offsetWidth - 24, window.innerWidth * 0.7);
       const top = Math.min(window.innerHeight - noBtn.offsetHeight - 24, window.innerHeight * 0.45);
@@ -154,7 +151,6 @@
       noBtn.style.top = (top || 200) + 'px';
     });
 
-    // Keep it inside viewport on resize
     window.addEventListener('resize', () => {
       const padding = 12;
       const left = parseFloat(getComputedStyle(noBtn).left) || 0;
@@ -253,7 +249,7 @@
     }
 
     // ===== show sticker overlay =====
-    function showSticker(duration = 5000) { // longer duration: 5000ms (5s)
+    function showSticker(duration = 5000) { // show 5s by default
       if (!sticker) return;
       sticker.classList.add('show');
       setTimeout(() => {
@@ -264,12 +260,12 @@
     // ===== Yes click: show sticker + confetti + sound, then open tab =====
     yesBtn.addEventListener("click", () => {
       // show visuals and play sound immediately
-      showSticker(5000); // show sticker for 5 seconds
+      showSticker(5000);
       firecrackerBurst();
       playFirecrackerSound();
 
       // short delay so the user can see the sticker before the new tab opens
-      const delayMs = 600; // tweak between ~400-800ms if desired
+      const delayMs = 600; // shorten to 400 if you want quicker opening
       let opened = false;
 
       setTimeout(() => {
