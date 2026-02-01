@@ -18,8 +18,8 @@
     }
     h1 { color: #d1004f; margin-bottom: 40px; text-align: center; }
 
-    /* keep buttons/sticker above hearts */
-    .buttons { display: flex; align-items: center; gap: 20px; position: relative; z-index: 3; }
+    /* UI above hearts */
+    .buttons { display: flex; align-items: center; gap: 20px; position: relative; z-index: 10; }
     button {
       padding: 15px 30px;
       font-size: 18px;
@@ -51,34 +51,36 @@
     }
     #sticker.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 
-    /* hearts-layer that floats hearts behind UI */
+    /* hearts layer: above background, below UI */
     .hearts-layer {
       position: fixed;
       inset: 0;
-      pointer-events: none; /* doesn't block anything */
+      pointer-events: none;
       overflow: hidden;
-      z-index: 1; /* behind buttons (z-index:3) and sticker (z-index:9999) */
+      z-index: 2; /* visible behind buttons (10) and below sticker (9999) */
     }
 
-    /* each heart element */
+    /* heart elements */
     .heart {
       position: absolute;
-      bottom: -40px; /* start slightly below view */
+      bottom: -60px;
       user-select: none;
       will-change: transform, opacity;
       display: inline-block;
-      transform: translateY(0) rotate(0deg) scale(1);
-      opacity: 0.95;
-      text-shadow: 0 1px 0 rgba(0,0,0,0.08);
+      text-shadow: 0 1px 0 rgba(0,0,0,0.06);
     }
 
-    /* float up + fade */
+    /* float up and fade */
     @keyframes heartFloat {
       0%   { transform: translateY(0) translateX(0) scale(0.85) rotate(0deg); opacity: 1; }
-      30%  { opacity: 1; }
-      100% { transform: translateY(-140vh) translateX(40px) scale(1.05) rotate(20deg); opacity: 0; }
+      65%  { opacity: 1; }
+      100% { transform: translateY(-140vh) translateX(var(--dx, 0px)) scale(1.05) rotate(var(--rot, 0deg)); opacity: 0; }
     }
-    /* side-to-side sway added via animation-delay/alternate speed */
+
+    /* Respect user preference for reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      .heart { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -90,7 +92,7 @@
     <button id="no"  type="button" aria-label="No">No 😜</button>
   </div>
 
-  <!-- Sticker image (from your Guest repo) -->
+  <!-- Sticker image from this repo -->
   <img id="sticker" src="https://raw.githubusercontent.com/sayonmallick/Guest/main/myphoto.jpg" alt="Sticker">
 
   <!-- hearts container -->
@@ -100,13 +102,11 @@
   <script>
     // ---------- CONFIG ----------
     const targetUrl = "https://sayonmallick.github.io/Guest/";
+    const SPAWN_INTERVAL = 180; // ms between spawns (lower = more hearts)
+    const MAX_HEARTS = 45;      // max simultaneous hearts
+    const INITIAL_SPAWN = 8;
 
-    // hearts spawn settings
-    const SPAWN_INTERVAL = 220; // ms between spawns (smaller = more hearts)
-    const MAX_HEARTS = 40;      // max simultaneous hearts
-    const INITIAL_SPAWN = 8;    // spawn some immediately on load
-
-    const HEART_CHARS = ['❤','💖','💘','❣️','💕','💓']; // variety of heart glyphs
+    const HEART_CHARS = ['❤','💖','💘','❣️','💕','💓'];
     const HEART_COLORS = ['#ff2f6d','#ff7f50','#ffb3c6','#ffd700','#ff66b2','#ff99cc'];
 
     // ---------- ELEMENTS ----------
@@ -115,12 +115,12 @@
     const yesBtn = document.getElementById('yes');
     const sticker = document.getElementById('sticker');
 
-    // preload sticker image to avoid visible loading delay
+    // preload sticker
     const _pre = new Image();
     _pre.src = sticker.src;
     sticker.setAttribute('aria-hidden', 'true');
 
-    // ---------- NO button behavior (unchanged) ----------
+    // ---------- NO button behavior ----------
     function moveNo() {
       const padding = 12;
       const btnW = noBtn.offsetWidth || 100;
@@ -138,7 +138,7 @@
     noBtn.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); moveNo(); }});
     window.addEventListener('load', () => { moveNo(); });
 
-    // ---------- confetti & sound (unchanged) ----------
+    // ---------- confetti & sound ----------
     function firecrackerBurst() {
       if (typeof confetti !== 'function') return;
       const colors = [['#ff2f6d','#ffd700','#ff7f50'], ['#ffb3c6','#ffffff','#ffd700'], ['#00aaff','#a0e9ff','#ffffff']];
@@ -195,59 +195,41 @@
       }
     }
 
-    // ---------- hearts system ----------
+    // ---------- hearts system (CSS animation based) ----------
     let activeHearts = 0;
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     function spawnHeart() {
-      if (prefersReduced) return;           // respect reduced motion
+      if (prefersReduced) return;
       if (!heartsLayer) return;
       if (activeHearts >= MAX_HEARTS) return;
 
-      const heart = document.createElement('div');
-      heart.className = 'heart';
-      const glyph = HEART_CHARS[Math.floor(Math.random() * HEART_CHARS.length)];
-      heart.textContent = glyph;
-
-      // randomize appearance
+      const el = document.createElement('div');
+      el.className = 'heart';
+      el.textContent = HEART_CHARS[Math.floor(Math.random() * HEART_CHARS.length)];
       const color = HEART_COLORS[Math.floor(Math.random() * HEART_COLORS.length)];
-      const size = 12 + Math.random() * 44; // px
+      const size = 14 + Math.random() * 44; // px
       const left = Math.random() * 100;     // vw percent
-      const duration = 3500 + Math.random() * 2500; // ms
-      const rotate = (Math.random() * 40) - 20; // deg
-      const sway = (Math.random() * 80) - 40; // px horizontal drift
+      const duration = 3200 + Math.random() * 3000; // ms
+      const dx = (Math.random() * 80 - 40); // px horizontal drift
+      const rot = Math.floor(Math.random() * 60 - 30); // rotation degrees
 
-      heart.style.left = left + 'vw';
-      heart.style.fontSize = size + 'px';
-      heart.style.color = color;
-      heart.style.opacity = 0.95;
-      heart.style.transform = `translateY(0) rotate(${rotate}deg)`;
-      heart.style.animation = `heartFloat ${duration}ms linear forwards`;
+      el.style.left = left + 'vw';
+      el.style.fontSize = size + 'px';
+      el.style.color = color;
+      // CSS custom properties used by keyframes (translateX via var)
+      el.style.setProperty('--dx', dx + 'px');
+      el.style.setProperty('--rot', rot + 'deg');
+      el.style.animation = `heartFloat ${duration}ms linear forwards`;
 
-      // slight horizontal sway by setting transform during float via CSS isn't easy, so add a small CSS transition using requestAnimationFrame
-      heartsLayer.appendChild(heart);
+      heartsLayer.appendChild(el);
       activeHearts++;
 
-      // add a small subtle horizontal movement using JS
-      const start = performance.now();
-      const startX = parseFloat(left);
-      const drift = (Math.random() * 18 - 9); // vw drift
-      function step(ts) {
-        const elapsed = ts - start;
-        const t = Math.min(elapsed / duration, 1);
-        // ease-in-out horizontal displacement
-        const dx = drift * Math.sin(t * Math.PI);
-        heart.style.transform = `translateY(${ -t * 140 }vh) translateX(${dx}vw) rotate(${rotate + t*20}deg) scale(${1 + t*0.05})`;
-        heart.style.opacity = String(1 - t);
-        if (t < 1) requestAnimationFrame(step);
-      }
-      requestAnimationFrame(step);
-
-      // remove after finished
+      // remove after animation finishes
       setTimeout(() => {
-        heart.remove();
+        el.remove();
         activeHearts = Math.max(0, activeHearts - 1);
-      }, duration + 100);
+      }, duration + 120);
     }
 
     // spawn loop
@@ -262,25 +244,23 @@
       spawnTimer = null;
     }
 
-    // start on load and create a few immediately for instant effect
+    // start on load with a small burst
     window.addEventListener('load', () => {
       startSpawning();
-      for (let i=0;i<INITIAL_SPAWN;i++) setTimeout(spawnHeart, i * 120);
+      for (let i = 0; i < INITIAL_SPAWN; i++) setTimeout(spawnHeart, i * 120);
     });
 
-    // ---------- sticker show ----------
+    // ---------- sticker and Yes click ----------
     function showSticker(duration = 5000) {
       if (!sticker) return;
       sticker.classList.add('show');
       setTimeout(() => sticker.classList.remove('show'), duration);
     }
 
-    // ---------- Yes click ----------
     yesBtn.addEventListener('click', () => {
       showSticker(5000);
       firecrackerBurst();
       playFirecrackerSound();
-
       const delayMs = 600;
       setTimeout(() => {
         try {
@@ -292,9 +272,10 @@
       }, delayMs);
     });
 
-    // debug listeners
+    // debug logs for troubleshooting
     sticker.addEventListener('error', () => console.error('Sticker image failed to load:', sticker.src));
     sticker.addEventListener('load', () => console.log('Sticker image loaded:', sticker.src));
+    console.log('Hearts spawn config:', { SPAWN_INTERVAL, MAX_HEARTS, INITIAL_SPAWN });
   </script>
 </body>
 </html>
