@@ -18,8 +18,8 @@
     }
     h1 { color: #d1004f; margin-bottom: 40px; text-align: center; }
 
-    .buttons { display: flex; align-items: center; gap: 20px; z-index: 2; }
-
+    /* keep buttons/sticker above hearts */
+    .buttons { display: flex; align-items: center; gap: 20px; position: relative; z-index: 3; }
     button {
       padding: 15px 30px;
       font-size: 18px;
@@ -32,7 +32,7 @@
 
     button:focus { outline: 3px solid rgba(209,0,79,0.25); outline-offset: 4px; }
 
-    /* sticker overlay */
+    /* sticker overlay (topmost) */
     #sticker {
       position: fixed;
       left: 50%;
@@ -51,44 +51,34 @@
     }
     #sticker.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 
-    /* hearts layer (floating love signs) */
+    /* hearts-layer that floats hearts behind UI */
     .hearts-layer {
       position: fixed;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none; /* non-interactive */
+      inset: 0;
+      pointer-events: none; /* doesn't block anything */
       overflow: hidden;
-      z-index: 1; /* behind UI but above background */
-    }
-    .heart {
-      position: absolute;
-      bottom: -40px;
-      font-size: 18px;
-      will-change: transform, opacity;
-      opacity: 0.95;
-      transform: translateY(0) rotate(0deg) scale(1);
-      animation-name: floatUp, sway;
-      animation-timing-function: linear, ease-in-out;
-      animation-iteration-count: 1, infinite;
-      user-select: none;
-    }
-    /* float up and fade out */
-    @keyframes floatUp {
-      0% { transform: translateY(0) scale(0.8); opacity: 1; }
-      70% { opacity: 1; }
-      100% { transform: translateY(-120vh) scale(1.05); opacity: 0; }
-    }
-    /* gentle horizontal sway */
-    @keyframes sway {
-      0% { transform: translateX(0) rotate(-10deg); }
-      50% { transform: translateX(12px) rotate(10deg); }
-      100% { transform: translateX(0) rotate(-10deg); }
+      z-index: 1; /* behind buttons (z-index:3) and sticker (z-index:9999) */
     }
 
-    /* ensure UI elements sit above hearts and sticker above everything */
-    .buttons { position: relative; z-index: 3; }
+    /* each heart element */
+    .heart {
+      position: absolute;
+      bottom: -40px; /* start slightly below view */
+      user-select: none;
+      will-change: transform, opacity;
+      display: inline-block;
+      transform: translateY(0) rotate(0deg) scale(1);
+      opacity: 0.95;
+      text-shadow: 0 1px 0 rgba(0,0,0,0.08);
+    }
+
+    /* float up + fade */
+    @keyframes heartFloat {
+      0%   { transform: translateY(0) translateX(0) scale(0.85) rotate(0deg); opacity: 1; }
+      30%  { opacity: 1; }
+      100% { transform: translateY(-140vh) translateX(40px) scale(1.05) rotate(20deg); opacity: 0; }
+    }
+    /* side-to-side sway added via animation-delay/alternate speed */
   </style>
 </head>
 <body>
@@ -103,33 +93,34 @@
   <!-- Sticker image (from your Guest repo) -->
   <img id="sticker" src="https://raw.githubusercontent.com/sayonmallick/Guest/main/myphoto.jpg" alt="Sticker">
 
-  <!-- Hearts layer -->
+  <!-- hearts container -->
   <div class="hearts-layer" aria-hidden="true"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <script>
     // ---------- CONFIG ----------
     const targetUrl = "https://sayonmallick.github.io/Guest/";
-    // Hearts config: spawn every X ms, up to max simultaneous hearts
-    const HEART_SPAWN_INTERVAL = 600; // ms between spawns
-    const MAX_HEARTS = 18;
 
-    // heart glyphs/colors you can customize
-    const HEART_CHARS = ['❤','💖','💘','❣️','💕'];
-    const HEART_COLORS = ['#ff2f6d', '#ff7f50', '#ffb3c6', '#ffd700', '#ff66b2'];
+    // hearts spawn settings
+    const SPAWN_INTERVAL = 220; // ms between spawns (smaller = more hearts)
+    const MAX_HEARTS = 40;      // max simultaneous hearts
+    const INITIAL_SPAWN = 8;    // spawn some immediately on load
+
+    const HEART_CHARS = ['❤','💖','💘','❣️','💕','💓']; // variety of heart glyphs
+    const HEART_COLORS = ['#ff2f6d','#ff7f50','#ffb3c6','#ffd700','#ff66b2','#ff99cc'];
 
     // ---------- ELEMENTS ----------
+    const heartsLayer = document.querySelector('.hearts-layer');
     const noBtn = document.getElementById('no');
     const yesBtn = document.getElementById('yes');
     const sticker = document.getElementById('sticker');
-    const heartsLayer = document.querySelector('.hearts-layer');
 
-    // preload sticker
+    // preload sticker image to avoid visible loading delay
     const _pre = new Image();
     _pre.src = sticker.src;
     sticker.setAttribute('aria-hidden', 'true');
 
-    // ---------- "No" button dodge ----------
+    // ---------- NO button behavior (unchanged) ----------
     function moveNo() {
       const padding = 12;
       const btnW = noBtn.offsetWidth || 100;
@@ -204,42 +195,78 @@
       }
     }
 
-    // ---------- hearts animation ----------
-    let currentHearts = 0;
+    // ---------- hearts system ----------
+    let activeHearts = 0;
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     function spawnHeart() {
+      if (prefersReduced) return;           // respect reduced motion
       if (!heartsLayer) return;
-      if (currentHearts >= MAX_HEARTS) return;
+      if (activeHearts >= MAX_HEARTS) return;
 
       const heart = document.createElement('div');
       heart.className = 'heart';
       const glyph = HEART_CHARS[Math.floor(Math.random() * HEART_CHARS.length)];
       heart.textContent = glyph;
-      const color = HEART_COLORS[Math.floor(Math.random() * HEART_COLORS.length)];
-      const size = 14 + Math.random() * 34; // px
-      const left = Math.random() * 100; // percent
-      const duration = 3500 + Math.random() * 3000; // ms
 
-      // position & style
+      // randomize appearance
+      const color = HEART_COLORS[Math.floor(Math.random() * HEART_COLORS.length)];
+      const size = 12 + Math.random() * 44; // px
+      const left = Math.random() * 100;     // vw percent
+      const duration = 3500 + Math.random() * 2500; // ms
+      const rotate = (Math.random() * 40) - 20; // deg
+      const sway = (Math.random() * 80) - 40; // px horizontal drift
+
       heart.style.left = left + 'vw';
       heart.style.fontSize = size + 'px';
       heart.style.color = color;
-      // set animation durations (floatUp and sway)
-      heart.style.animationDuration = (duration / 1000) + 's, ' + (2 + Math.random()*3) + 's';
+      heart.style.opacity = 0.95;
+      heart.style.transform = `translateY(0) rotate(${rotate}deg)`;
+      heart.style.animation = `heartFloat ${duration}ms linear forwards`;
 
+      // slight horizontal sway by setting transform during float via CSS isn't easy, so add a small CSS transition using requestAnimationFrame
       heartsLayer.appendChild(heart);
-      currentHearts++;
+      activeHearts++;
 
-      // clean up after animation finishes
+      // add a small subtle horizontal movement using JS
+      const start = performance.now();
+      const startX = parseFloat(left);
+      const drift = (Math.random() * 18 - 9); // vw drift
+      function step(ts) {
+        const elapsed = ts - start;
+        const t = Math.min(elapsed / duration, 1);
+        // ease-in-out horizontal displacement
+        const dx = drift * Math.sin(t * Math.PI);
+        heart.style.transform = `translateY(${ -t * 140 }vh) translateX(${dx}vw) rotate(${rotate + t*20}deg) scale(${1 + t*0.05})`;
+        heart.style.opacity = String(1 - t);
+        if (t < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+
+      // remove after finished
       setTimeout(() => {
         heart.remove();
-        currentHearts = Math.max(0, currentHearts - 1);
-      }, duration + 200);
+        activeHearts = Math.max(0, activeHearts - 1);
+      }, duration + 100);
     }
 
-    // spawn hearts periodically
-    const heartInterval = setInterval(spawnHeart, HEART_SPAWN_INTERVAL);
-    // spawn a few initially for instant effect
-    for (let i = 0; i < 6; i++) setTimeout(spawnHeart, i * 150);
+    // spawn loop
+    let spawnTimer = null;
+    function startSpawning() {
+      if (prefersReduced) return;
+      if (spawnTimer) clearInterval(spawnTimer);
+      spawnTimer = setInterval(spawnHeart, SPAWN_INTERVAL);
+    }
+    function stopSpawning() {
+      if (spawnTimer) clearInterval(spawnTimer);
+      spawnTimer = null;
+    }
+
+    // start on load and create a few immediately for instant effect
+    window.addEventListener('load', () => {
+      startSpawning();
+      for (let i=0;i<INITIAL_SPAWN;i++) setTimeout(spawnHeart, i * 120);
+    });
 
     // ---------- sticker show ----------
     function showSticker(duration = 5000) {
@@ -248,13 +275,12 @@
       setTimeout(() => sticker.classList.remove('show'), duration);
     }
 
-    // ---------- Yes button: show sticker then open Guest page ----------
+    // ---------- Yes click ----------
     yesBtn.addEventListener('click', () => {
       showSticker(5000);
       firecrackerBurst();
       playFirecrackerSound();
 
-      // small delay to let the user see the sticker before the new tab opens
       const delayMs = 600;
       setTimeout(() => {
         try {
@@ -266,7 +292,7 @@
       }, delayMs);
     });
 
-    // debug helpers
+    // debug listeners
     sticker.addEventListener('error', () => console.error('Sticker image failed to load:', sticker.src));
     sticker.addEventListener('load', () => console.log('Sticker image loaded:', sticker.src));
   </script>
